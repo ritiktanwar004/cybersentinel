@@ -1,0 +1,46 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Large Model Files (regenerate or download separately)
+ml/*.pkl
+ml/*.h5
+ml/*.model
+
+# Database Files (local state)
+*.db
+*.sqlite
+*.sqlite3
+
+# ML Dataset (if too large)
+ml/detection_x_merged.csv
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Python
+dist/
+build/
+*.egg-info/
+pip-log.txt
+
+# OS
+.env
+.env.local
+*.bak

@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>CyberSentinel — Phishing Detection Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- SCAN LINES OVERLAY -->
+    <div class="scanlines" aria-hidden="true"></div>
+    <div class="bg-grid" aria-hidden="true"></div>
+
+    <!-- ══════════ SIDEBAR ══════════ -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">
+          <span class="logo-shield">◈</span>
+        </div>
+        <div class="logo-text">Cyber<span>Sentinel</span></div>
+      </div>
+
+      <div class="nav-section-label">NAVIGATION</div>
+      <ul class="nav-links">
+        <li>
+          <a href="#" class="nav-link active" data-page="scanner">
+            <span class="nav-icon">⬡</span><span>URL Scanner</span
+            ><span class="nav-badge new">LIVE</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="nav-link" data-page="qr">
+            <span class="nav-icon">⊞</span><span>QR Analyzer</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="nav-link" data-page="bulk">
+            <span class="nav-icon">≡</span><span>Bulk Scan</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="nav-link" data-page="history">
+            <span class="nav-icon">◷</span><span>History</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="nav-link" data-page="model">
+            <span class="nav-icon">◉</span><span>ML Model</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="nav-link" data-page="analytics">
+            <span class="nav-icon">◈</span><span>Analytics</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="nav-section-label" style="margin-top: auto">SYSTEM</div>
+      <div class="sidebar-status">
+        <div class="status-row">
+          <span class="status-dot active"></span><span>Backend</span
+          ><span class="status-val" id="sidebarBackend">Checking…</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot" id="dotML"></span><span>ML Model</span
+          ><span class="status-val" id="sidebarML">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot" id="dotAI"></span><span>AI Engine</span
+          ><span class="status-val" id="sidebarAI">—</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ══════════ TOPBAR ══════════ -->
+    <div class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+      <div class="topbar-title" id="pageTitle">URL Scanner</div>
+      <div class="topbar-right">
+        <div class="threat-ticker" id="threatTicker">
+          <span class="ticker-label">THREAT LEVEL</span>
+          <span class="ticker-val" id="tickerVal">NOMINAL</span>
+        </div>
+        <div class="clock" id="topClock"></div>
+      </div>
+    </div>
+
+    <!-- ══════════ MAIN CONTENT ══════════ -->
+    <main class="main-content">
+      <!-- STATS STRIP -->
+      <div class="stats-strip" id="statsStrip">
+        <div class="stat-chip">
+          <span class="sc-label">Total Scans</span
+          ><span class="sc-val" id="st0">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="sc-label">Threats Found</span
+          ><span class="sc-val danger" id="st1">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="sc-label">Safe URLs</span
+          ><span class="sc-val safe" id="st2">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="sc-label">Suspicious</span
+          ><span class="sc-val warn" id="st3">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="sc-label">Last 24h</span
+          ><span class="sc-val" id="st4">—</span>
+        </div>
+      </div>
+
+      <!-- PROGRESS LINE -->
+      <div class="scan-progress" id="scanProgress">
+        <div class="scan-progress-fill" id="scanProgressFill"></div>
+      </div>
+
+      <!-- ════ PAGE: SCANNER ════ -->
+      <section class="page active" id="page-scanner">
+        <div class="page-header">
+          <h1 class="page-title">
+            URL <span class="accent">Threat Analysis</span>
+          </h1>
+          <p class="page-sub">
+            Powered by ensemble ML model (Random Forest + Logistic Regression)
+            and AI reasoning
+          </p>
+        </div>
+
+        <!-- SCAN INPUT CARD -->
+        <div class="card scan-card">
+          <div class="card-header">
+            <div class="card-label">⬡ SCAN TARGET</div>
+            <div class="model-controls">
+              <div class="model-badges">
+                <span
+                  class="mbadge"
+                  id="badgeRF"
+                  title="Random Forest model status"
+                  >RF</span
+                >
+                <span
+                  class="mbadge"
+                  id="badgeLR"
+                  title="Logistic Regression model status"
+                  >LR</span
+                >
+                <span class="mbadge ai" id="badgeAI" title="AI analysis status"
+                  >AI</span
+                >
+              </div>
+              <button
+                class="rf-toggle-btn"
+                id="rfToggleBtn"
+                type="button"
+                title="Toggle Random Forest model"
+              >
+                RF: OFF
+              </button>
+            </div>
+          </div>
+          <div class="rf-toggle-hint" id="rfToggleHint">
+            Checking RF model status…
+          </div>
+          <div class="scan-input-group">
+            <div class="url-input-wrap">
+              <span class="url-prefix">https://</span>
+              <input
+                id="urlInput"
+                class="url-input"
+                type="text"
+                placeholder="Enter URL or paste a suspicious link…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="clear-btn" id="clearUrlBtn" title="Clear">
+                ✕
+              </button>
+            </div>
+            <button class="btn-primary" id="scanBtn">
+              <span class="btn-icon">⚡</span> SCAN URL
+            </button>
+          </div>
+          <div class="scan-options">
+            <label class="opt-label"
+              ><input type="checkbox" id="optDeep" checked /> Deep AI
+              Analysis</label
+            >
+            <label class="opt-label"
+              ><input type="checkbox" id="optBrand" checked /> Brand Spoof
+              Check</label
+            >
+            <label class="opt-label"
+              ><input type="checkbox" id="optHistory" checked /> Save to
+              History</label
+            >
+          </div>
+          <div class="quick-tests">
+            <span class="qt-label">Quick test:</span>
+            <button
+              class="qt-btn phish"
+              onclick="testUrl('http://paypal-secure-login.tk/verify')"
+            >
+              Phishing sample
+            </button>
+            <button class="qt-btn safe" onclick="testUrl('https://google.com')">
+              Safe sample
+            </button>
+            <button
+              class="qt-btn warn"
+              onclick="testUrl('http://microsoft-account-verify.xyz/login')"
+            >
+              Suspicious sample
+            </button>
+          </div>
+        </div>
+
+        <!-- RESULT CARD -->
+        <div class="result-card card" id="resultCard" style="display: none">
+          <!-- TOP ROW -->
+          <div class="result-hero">
+            <div class="verdict-col">
+              <div class="verdict-badge" id="verdictBadge">—</div>
+              <div class="result-url" id="resultUrl">—</div>
+            </div>
+            <div class="score-col">
+              <svg class="score-ring" viewBox="0 0 120 120" id="scoreRingSvg">
+                <circle class="ring-bg" cx="60" cy="60" r="50" />
+                <circle
+                  class="ring-fill"
+                  id="ringFill"
+                  cx="60"
+                  cy="60"
+                  r="50"
+                  stroke-dasharray="314"
+                  stroke-dashoffset="314"
+                />
+              </svg>
+              <div class="score-center">
+                <div class="score-num" id="scoreNum">—</div>
+                <div class="score-label">RISK</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DUAL MODEL BAR -->
+          <div class="dual-model">
+            <div class="dm-row">
+              <span class="dm-label">Random Forest</span>
+              <div class="dm-bar-wrap">
+                <div class="dm-bar" id="rfBar"></div>
+              </div>
+              <span class="dm-val" id="rfVal">—</span>
+            </div>
+            <div class="dm-row">
+              <span class="dm-label">Logistic Regression</span>
+              <div class="dm-bar-wrap">
+                <div class="dm-bar lr" id="lrBar"></div>
+              </div>
+              <span class="dm-val" id="lrVal">—</span>
+            </div>
+            <div class="dm-row">
+              <span class="dm-label">Ensemble Score</span>
+              <div class="dm-bar-wrap">
+                <div class="dm-bar ensemble" id="ensBar"></div>
+              </div>
+              <span class="dm-val" id="ensVal">—</span>
+            </div>
+          </div>
+
+          <!-- INDICATORS GRID -->
+          <div class="section-label">◈ SECURITY INDICATORS</div>
+          <div class="indicators-grid" id="indicatorsGrid"></div>
+
+          <!-- AI THINKING SECTION -->
+          <div class="ai-section" id="aiSection">
+            <div class="ai-header">
+              <div class="ai-label">
+                <span class="ai-pulse"></span>
+                🧠 AI REASONING ENGINE
+              </div>
+              <div class="ai-model-tag">Chain-of-Thought Analysis</div>
+            </div>
+            <div class="ai-thinking" id="aiThinking">
+              <div class="think-step" id="ts1">
+                <span class="ts-icon">🔍</span><span class="ts-text"></span>
+              </div>
+              <div class="think-step" id="ts2">
+                <span class="ts-icon">⚖</span><span class="ts-text"></span>
+              </div>
+              <div class="think-step" id="ts3">
+                <span class="ts-icon">🎯</span><span class="ts-text"></span>
+              </div>
+            </div>
+            <div class="ai-conclusion" id="aiConclusion"></div>
+          </div>
+
+          <!-- ACTIONS -->
+          <div class="result-actions">
+            <button class="btn-ghost" id="copyReportBtn">📋 Copy Report</button>
+            <button class="btn-ghost" id="exportJsonBtn">⬇ Export JSON</button>
+            <button class="btn-ghost" id="shareLinkBtn">🔗 Share</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════ PAGE: QR ════ -->
+      <section class="page" id="page-qr">
+        <div class="page-header">
+          <h1 class="page-title">
+            QR Code <span class="accent">Threat Scanner</span>
+          </h1>
+          <p class="page-sub">
+            Decode QR codes and instantly analyze embedded URLs for phishing
+            threats
+          </p>
+        </div>
+        <div class="qr-layout">
+          <div class="card qr-upload-card">
+            <div class="card-label">⊞ UPLOAD QR IMAGE</div>
+            <div class="drop-zone" id="dropZone">
+              <div class="dz-icon">⊞</div>
+              <p class="dz-main">Drop QR image here</p>
+              <p class="dz-sub">
+                or <span class="dz-link" id="dzClick">click to browse</span>
+              </p>
+              <p class="dz-formats">PNG · JPG · WEBP · GIF</p>
+            </div>
+            <input
+              type="file"
+              id="qrFileInput"
+              accept="image/*"
+              style="display: none"
+            />
+            <div class="qr-actions">
+              <button class="btn-ghost" id="qrCamBtn">📷 Use Camera</button>
+              <button class="btn-ghost" id="qrPasteBtn">
+                📋 Paste Clipboard
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="card qr-result-card"
+            id="qrResultPanel"
+            style="display: none"
+          >
+            <div class="card-label">⊞ DECODED QR</div>
+            <div class="qr-decoded-layout">
+              <img id="qrPreviewImg" class="qr-preview-img" src="" alt="QR" />
+              <div class="qr-decoded-info">
+                <div class="qr-field">
+                  <span class="qf-label">DECODED CONTENT</span
+                  ><span class="qf-val" id="qrDecodedContent">—</span>
+                </div>
+                <div class="qr-field">
+                  <span class="qf-label">TYPE</span
+                  ><span class="qf-val" id="qrType">—</span>
+                </div>
+                <div class="qr-field">
+                  <span class="qf-label">LENGTH</span
+                  ><span class="qf-val" id="qrLength">—</span>
+                </div>
+                <button
+                  class="btn-primary"
+                  id="analyzeQrBtn"
+                  style="margin-top: 12px; width: 100%"
+                >
+                  ⚡ ANALYZE URL
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- QR SCAN RESULT (reuses same structure) -->
+        <div
+          class="result-card card"
+          id="qrScanResult"
+          style="display: none; margin-top: 20px"
+        >
+          <div class="result-hero">
+            <div class="verdict-col">
+              <div class="verdict-badge" id="qrVerdictBadge">—</div>
+              <div class="result-url" id="qrResultUrl">—</div>
+            </div>
+            <div class="score-col">
+              <svg class="score-ring" viewBox="0 0 120 120">
+                <circle class="ring-bg" cx="60" cy="60" r="50" />
+                <circle
+                  class="ring-fill"
+                  id="qrRingFill"
+                  cx="60"
+                  cy="60"
+                  r="50"
+                  stroke-dasharray="314"
+                  stroke-dashoffset="314"
+                />
+              </svg>
+              <div class="score-center">
+                <div class="score-num" id="qrScoreNum">—</div>
+                <div class="score-label">RISK</div>
+              </div>
+            </div>
+          </div>
+          <div class="indicators-grid" id="qrIndicatorsGrid"></div>
+          <div
+            class="ai-conclusion"
+            id="qrAiConclusion"
+            style="margin-top: 16px"
+          ></div>
+        </div>
+      </section>
+
+      <!-- ════ PAGE: BULK ════ -->
+      <section class="page" id="page-bulk">
+        <div class="page-header">
+          <h1 class="page-title">Bulk <span class="accent">Scanner</span></h1>
+          <p class="page-sub">
+            Scan up to 30 URLs simultaneously with full ML analysis
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-label">≡ PASTE URLs (ONE PER LINE)</div>
+          <textarea
+            class="bulk-textarea"
+            id="bulkTextarea"
+            placeholder="https://google.com&#10;http://paypal-secure-verify.tk&#10;https://github.com&#10;http://apple-id-suspended.xyz/verify&#10;…"
+          ></textarea>
+          <div class="bulk-controls">
+            <button class="btn-primary" id="bulkScanBtn">⚡ SCAN ALL</button>
+            <button class="btn-ghost" id="bulkClearBtn">✕ Clear</button>
+            <span class="bulk-count" id="bulkCount">0 URLs detected</span>
+            <button
+              class="btn-ghost"
+              id="bulkExportBtn"
+              style="margin-left: auto"
+            >
+              ⬇ Export CSV
+            </button>
+          </div>
+        </div>
+        <div id="bulkResultsContainer"></div>
+      </section>
+
+      <!-- ════ PAGE: HISTORY ════ -->
+      <section class="page" id="page-history">
+        <div class="page-header">
+          <h1 class="page-title">Scan <span class="accent">History</span></h1>
+          <p class="page-sub">
+            All past scans stored in SQLite database via backend API
+          </p>
+        </div>
+        <div class="card" style="padding: 16px 20px">
+          <div class="history-toolbar">
+            <input
+              class="search-input"
+              id="historySearch"
+              type="text"
+              placeholder="Search URLs…"
+            />
+            <select class="filter-select" id="historyFilter">
+              <option value="">All Verdicts</option>
+              <option value="phishing">Phishing</option>
+              <option value="suspicious">Suspicious</option>
+              <option value="legitimate">Legitimate</option>
+            </select>
+            <button class="btn-ghost" id="refreshHistoryBtn">↺ Refresh</button>
+            <button class="btn-ghost danger" id="clearHistoryBtn">
+              🗑 Clear DB
+            </button>
+            <button class="btn-ghost" id="exportHistoryBtn">⬇ CSV</button>
+          </div>
+        </div>
+        <div class="history-list" id="historyList">
+          <div class="empty-state">Loading history…</div>
+        </div>
+      </section>
+
+      <!-- ════ PAGE: MODEL INFO ════ -->
+      <section class="page" id="page-model">
+        <div class="page-header">
+          <h1 class="page-title">
+            ML <span class="accent">Model Dashboard</span>
+          </h1>
+          <p class="page-sub">
+            Trained on 60,235 labeled URLs using scikit-learn ensemble
+          </p>
+        </div>
+        <div class="model-grid">
+          <div class="card model-card" id="rfCard">
+            <div class="card-label">◉ RANDOM FOREST</div>
+            <div class="model-metric">
+              <span class="mm-label">Accuracy</span
+              ><span class="mm-val" id="rfAcc">—</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">F1 Score</span
+              ><span class="mm-val" id="rfF1">—</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">Trees</span><span class="mm-val">100</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">Max Depth</span
+              ><span class="mm-val">15</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">Ensemble Weight</span
+              ><span class="mm-val accent">60%</span>
+            </div>
+          </div>
+          <div class="card model-card" id="lrCard">
+            <div class="card-label">◉ LOGISTIC REGRESSION</div>
+            <div class="model-metric">
+              <span class="mm-label">Accuracy</span
+              ><span class="mm-val" id="lrAcc">—</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">F1 Score</span
+              ><span class="mm-val" id="lrF1">—</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">Max Iterations</span
+              ><span class="mm-val">500</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">Class Weight</span
+              ><span class="mm-val">Balanced</span>
+            </div>
+            <div class="model-metric">
+              <span class="mm-label">Ensemble Weight</span
+              ><span class="mm-val accent">40%</span>
+            </div>
+          </div>
+          <div class="card" style="grid-column: 1/-1">
+            <div class="card-label">◉ FEATURE ENGINEERING (18 Features)</div>
+            <div class="features-grid" id="featuresGrid"></div>
+          </div>
+          <div class="card" style="grid-column: 1/-1">
+            <div class="card-label">◉ DATASET</div>
+            <div class="dataset-info">
+              <div class="ds-row">
+                <span>Source</span><span>detection_x_merged.csv</span>
+              </div>
+              <div class="ds-row">
+                <span>Total URLs</span><span>60,235</span>
+              </div>
+              <div class="ds-row">
+                <span>Phishing</span><span class="danger">5,000 (8.3%)</span>
+              </div>
+              <div class="ds-row">
+                <span>Legitimate</span><span class="safe">55,235 (91.7%)</span>
+              </div>
+              <div class="ds-row"><span>Train Split</span><span>80%</span></div>
+              <div class="ds-row"><span>Test Split</span><span>20%</span></div>
+              <div class="ds-row">
+                <span>Stratified</span><span class="safe">Yes</span>
+              </div>
+              <div class="ds-row">
+                <span>Class Weights</span><span class="accent">Balanced</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════ PAGE: ANALYTICS ════ -->
+      <section class="page" id="page-analytics">
+        <div class="page-header">
+          <h1 class="page-title">
+            Threat <span class="accent">Analytics</span>
+          </h1>
+          <p class="page-sub">
+            Live statistics from your CyberSentinel scan database
+          </p>
+        </div>
+        <div class="analytics-grid">
+          <div class="card analytics-card">
+            <div class="card-label">◉ VERDICT DISTRIBUTION</div>
+            <div class="donut-wrap">
+              <canvas id="donutChart" width="200" height="200"></canvas>
+              <div class="donut-legend" id="donutLegend"></div>
+            </div>
+          </div>
+          <div class="card analytics-card">
+            <div class="card-label">◉ RISK SCORE BREAKDOWN</div>
+            <div class="bar-chart-wrap" id="barChartWrap">
+              <div class="empty-state">Scan some URLs to see analytics</div>
+            </div>
+          </div>
+          <div class="card" style="grid-column: 1/-1">
+            <div class="card-label">◉ RECENT THREAT FEED</div>
+            <div class="feed-list" id="feedList"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- CAMERA MODAL -->
+    <div class="modal-overlay" id="cameraModal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>📷 Camera QR Scanner</h3>
+          <button class="modal-close" id="closeCamBtn">✕</button>
+        </div>
+        <video
+          id="cameraFeed"
+          autoplay
+          playsinline
+          style="width: 100%; border-radius: 12px; background: #000"
+        ></video>
+        <canvas id="camCanvas" style="display: none"></canvas>
+        <p
+          style="
+            font-size: 0.78rem;
+            color: var(--muted);
+            font-family: var(--font-mono);
+            margin-top: 10px;
+          "
+        >
+          Point camera at QR code. Auto-detects and captures.
+        </p>
+        <div class="modal-actions">
+          <button class="btn-primary" id="captureCamBtn">
+            📸 Capture & Decode
+          </button>
+          <button class="btn-ghost" id="closeCamBtn2">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- jsQR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
