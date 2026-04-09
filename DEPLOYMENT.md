@@ -47,13 +47,15 @@ git push -u origin main
 ## Step 4: Verify Upload
 
 Visit `https://github.com/yourusername/cybersentinel`
+
 - ✅ Files appear
 - ✅ README.md displays
-- ✅ .gitignore working (ml/*.pkl not uploaded)
+- ✅ .gitignore working (ml/\*.pkl not uploaded)
 
 ## Step 5: Optional - Add GitHub Topics
 
 On your repo page:
+
 1. Click **⚙️ Settings**
 2. Scroll to **Topics**
 3. Add: `phishing-detection` `machine-learning` `security` `flask` `scikit-learn`

@@ -160,17 +160,18 @@ TRUSTED_HOSTS = {
 
 ## 🔌 API Reference
 
-| Method | Endpoint          | Description           |
-| ------ | ----------------- | --------------------- |
-| POST   | `/api/predict`    | Analyze single URL    |
-| POST   | `/api/bulk`       | Analyze up to 30 URLs |
-| GET    | `/api/history`    | Get scan history      |
-| GET    | `/api/stats`      | Get platform stats    |
-| GET    | `/api/model-info` | Model metadata        |
-| GET    | `/api/search?q=`  | Search history        |
-| GET/POST | `/api/model-control` | Get/set RF toggle |
+| Method   | Endpoint             | Description           |
+| -------- | -------------------- | --------------------- |
+| POST     | `/api/predict`       | Analyze single URL    |
+| POST     | `/api/bulk`          | Analyze up to 30 URLs |
+| GET      | `/api/history`       | Get scan history      |
+| GET      | `/api/stats`         | Get platform stats    |
+| GET      | `/api/model-info`    | Model metadata        |
+| GET      | `/api/search?q=`     | Search history        |
+| GET/POST | `/api/model-control` | Get/set RF toggle     |
 
 ### Example: Predict Single URL
+
 ```bash
 curl -X POST http://localhost:5000/api/predict \
   -H "Content-Type: application/json" \
@@ -178,6 +179,7 @@ curl -X POST http://localhost:5000/api/predict \
 ```
 
 **Response:**
+
 ```json
 {
   "url": "https://google.com",
@@ -194,6 +196,7 @@ curl -X POST http://localhost:5000/api/predict \
 ```
 
 ### Example: Toggle RF Model
+
 ```bash
 curl -X POST http://localhost:5000/api/model-control \
   -H "Content-Type: application/json" \
@@ -259,6 +262,7 @@ CREATE TABLE scans (
 ## 🛠 Troubleshooting
 
 ### Backend won't start
+
 ```bash
 # Check if port 5000 is already in use
 netstat -an | grep 5000
@@ -268,6 +272,7 @@ lsof -i :5000 | grep LISTEN | awk '{print $2}' | xargs kill -9
 ```
 
 ### "RF Model not found" error
+
 ```bash
 # Train a new Random Forest model
 python backend/train_rf.py --dataset ml/detection_x_merged.csv
@@ -276,16 +281,19 @@ python backend/train_rf.py --dataset ml/detection_x_merged.csv
 ```
 
 ### Frontend not loading
+
 - Ensure backend is running on `http://127.0.0.1:5000`
 - Check browser console for CORS errors
 - Clear browser cache (Ctrl+Shift+Delete)
 
 ### QR Scanner not working
+
 - QR scanner requires HTTPS or localhost
 - Upload image or use camera permission
 - jsQR may have CDN issues; consider hosting locally
 
 ### Database locked error
+
 - Ensure only one instance of backend is running
 - Delete `backend/cybersentinel.db` to reset (loses history)
 
@@ -312,11 +320,13 @@ Output: `ml/rf_model.pkl` with accuracy metrics
 ## 📦 Deployment
 
 ### Local Development
+
 ```bash
 python backend/app.py
 ```
 
 ### Docker (Optional)
+
 ```bash
 # Build image
 docker build -t cybersentinel .
@@ -326,6 +336,7 @@ docker run -p 5000:5000 cybersentinel
 ```
 
 ### Heroku / Cloud Platforms
+
 1. Add `Procfile`: `web: python backend/app.py`
 2. Set environment `FLASK_ENV=production`
 3. Deploy with Git
@@ -349,6 +360,7 @@ Contributions are welcome! Please:
 5. Open a Pull Request
 
 ### Ideas for Contribution
+
 - [ ] Add more URL features for better accuracy
 - [ ] Integrate with modern threat intelligence APIs
 - [ ] Build desktop app wrapper (Electron)
