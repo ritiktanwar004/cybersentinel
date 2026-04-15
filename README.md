@@ -325,6 +325,21 @@ Output: `ml/rf_model.pkl` with accuracy metrics
 python backend/app.py
 ```
 
+### Render (Recommended)
+
+This repo includes `render.yaml` for one-click deployment.
+
+1. Push latest code to GitHub
+2. In Render, click **New +** → **Blueprint**
+3. Select this repository
+4. Render auto-uses `render.yaml`
+
+Production start command used by Render:
+
+```bash
+gunicorn backend.app:app --bind 0.0.0.0:$PORT
+```
+
 ### Docker (Optional)
 
 ```bash
@@ -335,11 +350,7 @@ docker build -t cybersentinel .
 docker run -p 5000:5000 cybersentinel
 ```
 
-### Heroku / Cloud Platforms
-
-1. Add `Procfile`: `web: python backend/app.py`
-2. Set environment `FLASK_ENV=production`
-3. Deploy with Git
+For full deploy steps, see `DEPLOYMENT.md`.
 
 ---
 

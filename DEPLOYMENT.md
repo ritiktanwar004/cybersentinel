@@ -1,117 +1,51 @@
-# GitHub Deployment Guide
+# Render Deployment Guide
 
-## Step 1: Create GitHub Repository
+This project is configured for Render using `render.yaml`.
 
-1. Go to [github.com/new](https://github.com/new)
-2. Enter repository name: `cybersentinel`
-3. Description: "Phishing Detection Platform with ML Ensemble & AI Analysis"
-4. Choose **Public** (for portfolio) or **Private**
-5. **DO NOT check** "Initialize with README" (you already have one)
-6. Click **Create repository**
+## Prerequisites
 
-## Step 2: Initialize Git Locally
+1. Code pushed to GitHub
+2. Render account connected with GitHub
 
-In your project directory, run:
+## Deployment (Blueprint - Recommended)
 
-```bash
-cd cybersentinel
-git init
-git add .
-git commit -m "Initial CyberSentinel commit - ML phishing detector with 97% accuracy"
-```
+1. Open Render dashboard
+2. Click **New +** → **Blueprint**
+3. Select your `cybersentinel` repository
+4. Render auto-detects `render.yaml`
+5. Click **Apply**
 
-## Step 3: Add Remote and Push
+Render will automatically use:
 
-Replace `yourusername` with your actual GitHub username:
+- Build command: `pip install -r requirements.txt`
+- Start command: `gunicorn backend.app:app --bind 0.0.0.0:$PORT`
+- Health check: `/api`
 
-```bash
-git branch -M main
-git remote add origin https://github.com/ritiktanwar004/cybersentinel.git
-git push -u origin main
-```
+## Included Configuration
 
-If you get a **permission error**, use SSH instead:
+- `render.yaml` at repo root
+- `backend/__init__.py` for stable module import path (`backend.app:app`)
+- `gunicorn` dependency in `requirements.txt`
 
-```bash
-# Generate SSH key (if you don't have one)
-ssh-keygen -t ed25519 -C "your_email@example.com"
+## After Deploy
 
-# Add SSH key to GitHub: Settings → SSH and GPG keys → New SSH key
+1. Open your Render service URL
+2. Check API health: `https://<your-service>.onrender.com/api`
+3. App UI should open at root path: `https://<your-service>.onrender.com/`
 
-# Then push using SSH
-git remote remove origin
-git remote add origin git@github.com:yourusername/cybersentinel.git
-git push -u origin main
-```
+## Updating Deployment
 
-## Step 4: Verify Upload
-
-Visit `https://github.com/yourusername/cybersentinel`
-
-- ✅ Files appear
-- ✅ README.md displays
-- ✅ .gitignore working (ml/\*.pkl not uploaded)
-
-## Step 5: Optional - Add GitHub Topics
-
-On your repo page:
-
-1. Click **⚙️ Settings**
-2. Scroll to **Topics**
-3. Add: `phishing-detection` `machine-learning` `security` `flask` `scikit-learn`
-
-## Step 6: Optional - Enable GitHub Pages (for documentation)
-
-1. Settings → Pages
-2. Source: `main` branch / `root` folder
-3. Wait for deployment (shows green checkmark)
-4. Visit `https://yourusername.github.io/cybersentinel`
-
-## Step 7: Add Code of Conduct (Optional)
-
-```bash
-# GitHub can auto-generate one
-# Go to Settings → Community → Code of Conduct → Add
-```
-
-## Updating Repository
-
-After making changes locally:
+Every push to `main` triggers auto-deploy (because `autoDeploy: true`).
 
 ```bash
 git add .
-git commit -m "Describe your changes"
+git commit -m "Your update"
 git push origin main
 ```
 
----
+## Troubleshooting
 
-## Quick Reference
-
-```bash
-# First time setup
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/yourusername/cybersentinel.git
-git push -u origin main
-
-# Future updates
-git add .
-git commit -m "Your message"
-git push origin main
-```
-
----
-
-## Important Notes
-
-- **Large files excluded:** `.gitignore` prevents uploading `ml/*.pkl` and `*.db` (regenerate on install)
-- **Security:** Never commit API keys or credentials
-- **CI/CD:** `.github/workflows/python-tests.yml` runs automatically on push
-- **Dataset:** `ml/detection_x_merged.csv` is gitignored; users can train from scratch or download from releases
-
----
-
-For more help, see [GitHub Docs](https://docs.github.com/en/repositories/creating-and-managing-repositories/quickstart-for-repositories).
+1. **Build fails**: confirm `requirements.txt` is valid and committed.
+2. **Start fails**: verify service logs and ensure `backend/app.py` contains `app = Flask(...)`.
+3. **404 at root**: verify `frontend/index.html` exists in repo.
+4. **Model file missing**: if `ml/rf_model.pkl` is not in repo, app will run in LR-only mode.

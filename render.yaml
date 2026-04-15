@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: cybersentinel
+    env: python
+    plan: free
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn backend.app:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /api
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
