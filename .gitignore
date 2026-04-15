@@ -12,6 +12,7 @@ __pycache__/
 ml/*.pkl
 ml/*.h5
 ml/*.model
+!ml/rf_model.pkl
 
 # Database Files (local state)
 *.db
