@@ -342,6 +342,7 @@ const TRUSTED_DOMAINS = [
   "ebay.com",
 ];
 const TRUSTED_HOSTS = new Set([
+  "ritiktanwar004.github.io",
   "www.snapchat.com",
   "snapchat.com",
   "google.com",
@@ -1099,7 +1100,9 @@ function setupQrEvents() {
       }
       alert("No image in clipboard. Copy a QR image first.");
     } catch {
-      alert("Clipboard access denied. Please upload the file.");
+      alert(
+        "Clipboard access denied. Permission is only needed for QR paste. Normal URL scanning works without permission. You can upload the file instead.",
+      );
     }
   });
 
@@ -1228,7 +1231,9 @@ async function startCamera() {
     });
     document.getElementById("cameraFeed").srcObject = cameraStream;
   } catch {
-    alert("Camera access denied.");
+    alert(
+      "Camera access denied. Permission is only needed for QR camera scan. Normal URL scanning works without permission.",
+    );
     stopCamera();
   }
 }

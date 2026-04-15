@@ -127,6 +127,7 @@ TRUSTED_DOMAINS = [
     'wikipedia.org','reddit.com','instagram.com','netflix.com','ebay.com'
 ]
 TRUSTED_HOSTS = {
+    'ritiktanwar004.github.io',
     'www.snapchat.com',
     'snapchat.com',
     'google.com',
