@@ -25,6 +25,7 @@ let rfToggleState = {
 //  INIT
 // ═══════════════════════════════════════════════════
 document.addEventListener("DOMContentLoaded", async () => {
+  setupThemeToggle();
   startClock();
   loadModelWeights();
   setupModelToggle();
@@ -39,6 +40,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderModelPage();
   startFeedAnimation();
 });
+
+function setupThemeToggle() {
+  const btn = document.getElementById("themeToggleBtn");
+  if (!btn) return;
+
+  const applyMode = (mode) => {
+    const isDark = mode === "dark";
+    document.body.classList.toggle("dark-theme", isDark);
+    btn.textContent = isDark ? "Light Mode" : "Dark Mode";
+    btn.setAttribute("aria-pressed", isDark ? "true" : "false");
+  };
+
+  const saved = localStorage.getItem("cs_theme_mode");
+  if (saved === "dark" || saved === "light") {
+    applyMode(saved);
+  } else {
+    applyMode("light");
+  }
+
+  btn.addEventListener("click", () => {
+    const next = document.body.classList.contains("dark-theme")
+      ? "light"
+      : "dark";
+    localStorage.setItem("cs_theme_mode", next);
+    applyMode(next);
+  });
+}
 
 // ═══════════════════════════════════════════════════
 //  CLOCK
@@ -426,6 +454,38 @@ function parseUrl(url) {
   }
 }
 
+function normalizeAndValidateUrl(rawUrl) {
+  const text = String(rawUrl || "").trim();
+  if (!text) return { ok: false, error: "Please enter a URL." };
+  if (/\s/.test(text)) {
+    return {
+      ok: false,
+      error:
+        "Invalid URL: spaces/text sentence detected. Enter only a URL like example.com",
+    };
+  }
+
+  const normalized = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  const parsed = parseUrl(normalized);
+  if (!parsed || !parsed.hostname) {
+    return { ok: false, error: "Invalid URL format." };
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (host === "localhost") return { ok: true, normalized };
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    return { ok: true, normalized };
+  }
+  if (!host.includes(".")) {
+    return {
+      ok: false,
+      error: "Invalid URL: enter a full domain like example.com",
+    };
+  }
+
+  return { ok: true, normalized };
+}
+
 function extractFeatures(url) {
   const urlStr = url.trim();
   const parsed = parseUrl(urlStr);
@@ -733,7 +793,12 @@ window.testUrl = function (url) {
 async function triggerScan() {
   const rawUrl = document.getElementById("urlInput").value.trim();
   if (!rawUrl) return;
-  const url = rawUrl.startsWith("http") ? rawUrl : "https://" + rawUrl;
+  const validated = normalizeAndValidateUrl(rawUrl);
+  if (!validated.ok) {
+    alert(validated.error);
+    return;
+  }
+  const url = validated.normalized;
 
   setProgress(true);
   const btn = document.getElementById("scanBtn");
@@ -776,8 +841,23 @@ async function triggerScan() {
         result.indicators = buildIndicators(browser.feats, browser.extras);
         result.extras = browser.extras;
         result.feats = browser.feats;
-      } else throw new Error("Backend error");
-    } catch {
+      } else {
+        let backendError = "Unable to scan URL";
+        try {
+          const errData = await resp.json();
+          backendError = errData.error || backendError;
+        } catch {}
+
+        // If backend rejected the input, do not classify using browser fallback.
+        if (resp.status >= 400 && resp.status < 500) {
+          throw new Error(backendError);
+        }
+        throw new Error("Backend unavailable");
+      }
+    } catch (err) {
+      if (err && err.message && err.message !== "Backend unavailable") {
+        throw err;
+      }
       // Fallback: browser-side ML
       const browser = browserPredict(url);
       result = {
@@ -839,7 +919,9 @@ async function triggerScan() {
     // Save local stats
     saveLocalHistory(result);
   } catch (err) {
+    const msg = err?.message || "Scan failed. Please try again.";
     console.error("Scan error:", err);
+    alert(msg);
   }
 
   setProgress(false);
@@ -1115,6 +1197,14 @@ function setupQrEvents() {
     .getElementById("analyzeQrBtn")
     .addEventListener("click", async () => {
       if (!currentQrUrl) return;
+      const validated = normalizeAndValidateUrl(currentQrUrl);
+      if (!validated.ok) {
+        alert(
+          "Decoded QR content is not a valid URL. This scanner only analyzes links.",
+        );
+        return;
+      }
+      currentQrUrl = validated.normalized;
       const btn = document.getElementById("analyzeQrBtn");
       btn.disabled = true;
       btn.innerHTML = `<span class="loader"></span> Analyzing…`;
@@ -1307,6 +1397,27 @@ async function runBulkScan() {
     .slice(0, 30);
   if (!lines.length) return;
 
+  const invalidLines = [];
+  const validLines = [];
+  lines.forEach((line) => {
+    const validated = normalizeAndValidateUrl(line);
+    if (validated.ok) {
+      validLines.push(validated.normalized);
+    } else {
+      invalidLines.push(line);
+    }
+  });
+
+  if (!validLines.length) {
+    alert("No valid URLs found. Please enter URLs like example.com");
+    return;
+  }
+  if (invalidLines.length) {
+    alert(
+      `${invalidLines.length} invalid line(s) skipped. Only valid URLs will be scanned.`,
+    );
+  }
+
   const btn = document.getElementById("bulkScanBtn");
   btn.disabled = true;
   btn.innerHTML = `<span class="loader"></span> Scanning…`;
@@ -1323,14 +1434,14 @@ async function runBulkScan() {
     const resp = await fetch(`${API}/bulk`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls: lines }),
+      body: JSON.stringify({ urls: validLines }),
       signal: AbortSignal.timeout(30000),
     });
     if (resp.ok) backendResults = (await resp.json()).results;
   } catch {}
 
-  for (let i = 0; i < lines.length; i++) {
-    const url = lines[i].startsWith("http") ? lines[i] : "https://" + lines[i];
+  for (let i = 0; i < validLines.length; i++) {
+    const url = validLines[i];
     let r;
     if (backendResults && backendResults[i]) {
       r = backendResults[i];

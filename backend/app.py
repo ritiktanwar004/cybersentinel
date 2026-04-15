@@ -6,6 +6,7 @@ API runs on http://localhost:5000
 
 from __future__ import annotations
 import json, re, sqlite3, time, os, hashlib
+import ipaddress
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -197,6 +198,55 @@ def get_host(url: str) -> str:
 
 def is_trusted_host(url: str) -> bool:
     return get_host(url) in TRUSTED_HOSTS
+
+def normalize_and_validate_url(raw_url: str):
+    """Normalize input to a canonical URL and reject plain random text."""
+    text = str(raw_url or '').strip()
+    if not text:
+        return None, 'url is required'
+    if any(ch.isspace() for ch in text):
+        return None, 'invalid URL: spaces are not allowed'
+
+    normalized = text if re.match(r'^https?://', text, flags=re.IGNORECASE) else f'https://{text}'
+
+    try:
+        parsed = urlparse(normalized)
+    except Exception:
+        return None, 'invalid URL format'
+
+    if parsed.scheme not in ('http', 'https'):
+        return None, 'invalid URL: only http/https are supported'
+
+    host = (parsed.hostname or '').lower()
+    if not host:
+        return None, 'invalid URL: hostname is missing'
+
+    # Accept valid IP hosts and localhost for development.
+    try:
+        ipaddress.ip_address(host)
+        return normalized, None
+    except ValueError:
+        pass
+
+    if host == 'localhost':
+        return normalized, None
+
+    # Require a realistic domain: contains a dot and valid labels/TLD.
+    if '.' not in host:
+        return None, 'invalid URL: enter a full domain like example.com'
+
+    if host.startswith('.') or host.endswith('.') or '..' in host:
+        return None, 'invalid URL: malformed domain'
+
+    labels = host.split('.')
+    if not all(re.match(r'^[a-z0-9-]+$', label) and not label.startswith('-') and not label.endswith('-') for label in labels):
+        return None, 'invalid URL: malformed domain labels'
+
+    tld = labels[-1]
+    if len(tld) < 2 or not tld.isalpha():
+        return None, 'invalid URL: malformed top-level domain'
+
+    return normalized, None
 
 def extract_features(url: str):
     url = str(url).strip()
@@ -501,11 +551,9 @@ def api_model_control_post():
 @app.route('/api/predict', methods=['POST'])
 def api_predict():
     body = request.get_json(silent=True) or {}
-    url  = str(body.get('url', '')).strip()
-    if not url:
-        return jsonify({'error': 'url is required'}), 400
-
-    normalized = url if url.startswith('http') else 'https://' + url
+    normalized, err = normalize_and_validate_url(body.get('url', ''))
+    if err:
+        return jsonify({'error': err}), 400
     url_hash   = hashlib.md5(normalized.encode()).hexdigest()
 
     # Run ML
@@ -559,10 +607,14 @@ def api_bulk():
     urls = [str(u).strip() for u in urls[:30] if u]
 
     results = []
+    invalid = []
     conn = get_db()
     c = conn.cursor()
     for url in urls:
-        normalized = url if url.startswith('http') else 'https://' + url
+        normalized, err = normalize_and_validate_url(url)
+        if err:
+            invalid.append({'input': url, 'error': err})
+            continue
         url_hash   = hashlib.md5(normalized.encode()).hexdigest()
         result = ensemble_predict(normalized)
         verdict    = result['verdict']
@@ -579,7 +631,7 @@ def api_bulk():
                         'ml_score': result.get('ml_score')})
     conn.commit()
     conn.close()
-    return jsonify({'results': results, 'count': len(results)})
+    return jsonify({'results': results, 'count': len(results), 'invalid': invalid})
 
 
 @app.route('/api/history', methods=['GET'])
