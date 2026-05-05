@@ -30,12 +30,19 @@ except:
     REQUESTS_AVAILABLE = False
 
 # ════════════════════════════════════════
-#  PATHS
+#  PATHS (Render-compatible)
 # ════════════════════════════════════════
 BASE_DIR   = Path(__file__).parent.parent
 ML_DIR     = BASE_DIR / "ml"
 FRONTEND   = BASE_DIR / "frontend"
-DB_PATH    = BASE_DIR / "backend" / "cybersentinel.db"
+
+# Use /tmp for database on Render, local for development
+RENDER_ENV = os.environ.get('RENDER', False)
+if RENDER_ENV:
+    DB_PATH = Path('/tmp') / "cybersentinel.db"
+else:
+    DB_PATH = BASE_DIR / "backend" / "cybersentinel.db"
+
 MODEL_PATH = ML_DIR / "rf_model.pkl"
 WEIGHTS    = ML_DIR / "model_weights.json"
 
@@ -45,42 +52,50 @@ app = Flask(__name__, static_folder=str(FRONTEND), static_url_path="")
 #  DATABASE SETUP
 # ════════════════════════════════════════
 def get_db():
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.row_factory = sqlite3.Row
+        return conn
+    except Exception as e:
+        print(f"[DB] Connection error: {e}")
+        raise
 
 def init_db():
-    conn = get_db()
-    c = conn.cursor()
-    c.executescript("""
-    CREATE TABLE IF NOT EXISTS scans (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        url         TEXT NOT NULL,
-        url_hash    TEXT NOT NULL,
-        verdict     TEXT NOT NULL,
-        risk_score  REAL NOT NULL,
-        ml_score    REAL,
-        lr_score    REAL,
-        features    TEXT,
-        ai_analysis TEXT,
-        ip_address  TEXT,
-        created_at  TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_url_hash ON scans(url_hash);
-    CREATE INDEX IF NOT EXISTS idx_verdict  ON scans(verdict);
-    CREATE INDEX IF NOT EXISTS idx_created  ON scans(created_at);
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.executescript("""
+        CREATE TABLE IF NOT EXISTS scans (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            url         TEXT NOT NULL,
+            url_hash    TEXT NOT NULL,
+            verdict     TEXT NOT NULL,
+            risk_score  REAL NOT NULL,
+            ml_score    REAL,
+            lr_score    REAL,
+            features    TEXT,
+            ai_analysis TEXT,
+            ip_address  TEXT,
+            created_at  TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_url_hash ON scans(url_hash);
+        CREATE INDEX IF NOT EXISTS idx_verdict  ON scans(verdict);
+        CREATE INDEX IF NOT EXISTS idx_created  ON scans(created_at);
 
-    CREATE TABLE IF NOT EXISTS stats (
-        key   TEXT PRIMARY KEY,
-        value INTEGER DEFAULT 0
-    );
-    INSERT OR IGNORE INTO stats VALUES ('total_scans', 0);
-    INSERT OR IGNORE INTO stats VALUES ('phishing_found', 0);
-    INSERT OR IGNORE INTO stats VALUES ('safe_found', 0);
-    INSERT OR IGNORE INTO stats VALUES ('suspicious_found', 0);
-    """)
-    conn.commit()
-    conn.close()
+        CREATE TABLE IF NOT EXISTS stats (
+            key   TEXT PRIMARY KEY,
+            value INTEGER DEFAULT 0
+        );
+        INSERT OR IGNORE INTO stats VALUES ('total_scans', 0);
+        INSERT OR IGNORE INTO stats VALUES ('phishing_found', 0);
+        INSERT OR IGNORE INTO stats VALUES ('safe_found', 0);
+        INSERT OR IGNORE INTO stats VALUES ('suspicious_found', 0);
+        """)
+        conn.commit()
+        conn.close()
+        print(f"[DB] ✓ Initialized at {DB_PATH}")
+    except Exception as e:
+        print(f"[DB] ✗ Init failed: {e} — app will continue with in-memory mode")
 
 init_db()
 
@@ -94,14 +109,24 @@ RF_ENABLED = True
 if RF_AVAILABLE and MODEL_PATH.exists():
     try:
         RF_MODEL = joblib.load(str(MODEL_PATH))
-        print(f"[ML] RF model loaded — acc={RF_MODEL.get('accuracy','?')}")
+        print(f"[ML] ✓ RF model loaded — acc={RF_MODEL.get('accuracy','?')}")
     except Exception as e:
-        print(f"[ML] RF load failed: {e}")
+        print(f"[ML] ✗ RF load failed: {e}")
+else:
+    if not MODEL_PATH.exists():
+        print(f"[ML] ⚠ RF model not found at {MODEL_PATH} — LR-only mode")
+    if not RF_AVAILABLE:
+        print(f"[ML] ⚠ joblib/numpy not available — LR-only mode")
 
 if WEIGHTS.exists():
-    with open(WEIGHTS) as f:
-        WEIGHTS_DATA = json.load(f)
-    print(f"[ML] LR weights loaded — acc={WEIGHTS_DATA.get('accuracy','?')}")
+    try:
+        with open(WEIGHTS) as f:
+            WEIGHTS_DATA = json.load(f)
+        print(f"[ML] ✓ LR weights loaded — acc={WEIGHTS_DATA.get('accuracy','?')}")
+    except Exception as e:
+        print(f"[ML] ✗ LR weights load failed: {e}")
+else:
+    print(f"[ML] ⚠ LR weights not found at {WEIGHTS}")
 
 
 def get_rf_state():
@@ -736,4 +761,9 @@ if __name__ == '__main__':
     print("  API: http://localhost:5000/api/")
     print("  App: http://localhost:5000/")
     print("═"*55 + "\n")
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    
+    # Read port from environment (Render sets PORT variable)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    app.run(debug=debug, port=port, host='0.0.0.0')
