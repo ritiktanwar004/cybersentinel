@@ -8,7 +8,7 @@
 // ═══════════════════════════════════════════════════
 //  CONFIG
 // ═══════════════════════════════════════════════════
-const API = "http://localhost:5000/api"; // change if backend on different port
+const API = "/api"; // change if backend on different port
 let MODEL_WEIGHTS = null; // loaded from /ml/model_weights.json
 let currentQrUrl = "";
 let cameraStream = null;
