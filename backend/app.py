@@ -49,51 +49,130 @@ WEIGHTS    = ML_DIR / "model_weights.json"
 app = Flask(__name__, static_folder=str(FRONTEND), static_url_path="")
 
 # ════════════════════════════════════════
-#  DATABASE SETUP
+#  DATABASE SETUP (SQLite by default, Postgres if DATABASE_URL provided)
 # ════════════════════════════════════════
-def get_db():
+# Detect managed database URL (Render or other providers set `DATABASE_URL`)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+USE_POSTGRES = bool(DATABASE_URL)
+engine = None
+if USE_POSTGRES:
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.row_factory = sqlite3.Row
-        return conn
+        from sqlalchemy import create_engine
+        engine = create_engine(DATABASE_URL, future=True)
+        print(f"[DB] Using Postgres via DATABASE_URL")
     except Exception as e:
-        print(f"[DB] Connection error: {e}")
-        raise
+        print(f"[DB] SQLAlchemy engine creation failed: {e}")
+        engine = None
+        USE_POSTGRES = False
+
+def _get_sqlite_conn():
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def execute_sql(query: str, params=()):
+    """Execute SQL against Postgres (psycopg via SQLAlchemy raw connection)
+    or against local SQLite. Returns fetched rows as list[dict] if any.
+    """
+    if USE_POSTGRES and engine:
+        raw = engine.raw_connection()
+        cur = raw.cursor()
+        try:
+            # Convert sqlite '?' placeholders to psycopg2 '%s'
+            pg_query = query.replace('?', '%s')
+            cur.execute(pg_query, params)
+            if cur.description:
+                cols = [d[0] for d in cur.description]
+                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+                raw.commit()
+                return rows
+            raw.commit()
+            return None
+        finally:
+            cur.close()
+            raw.close()
+    else:
+        conn = _get_sqlite_conn()
+        cur = conn.cursor()
+        cur.execute(query, params or ())
+        if cur.description:
+            rows = [dict(r) for r in cur.fetchall()]
+            conn.close()
+            return rows
+        conn.commit()
+        conn.close()
+        return None
+
 
 def init_db():
     try:
-        conn = get_db()
-        c = conn.cursor()
-        c.executescript("""
-        CREATE TABLE IF NOT EXISTS scans (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            url         TEXT NOT NULL,
-            url_hash    TEXT NOT NULL,
-            verdict     TEXT NOT NULL,
-            risk_score  REAL NOT NULL,
-            ml_score    REAL,
-            lr_score    REAL,
-            features    TEXT,
-            ai_analysis TEXT,
-            ip_address  TEXT,
-            created_at  TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_url_hash ON scans(url_hash);
-        CREATE INDEX IF NOT EXISTS idx_verdict  ON scans(verdict);
-        CREATE INDEX IF NOT EXISTS idx_created  ON scans(created_at);
+        if USE_POSTGRES and engine:
+            raw = engine.raw_connection()
+            cur = raw.cursor()
+            # Create tables in Postgres
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS scans (
+                id SERIAL PRIMARY KEY,
+                url TEXT NOT NULL,
+                url_hash TEXT NOT NULL,
+                verdict TEXT NOT NULL,
+                risk_score REAL NOT NULL,
+                ml_score REAL,
+                lr_score REAL,
+                features TEXT,
+                ai_analysis TEXT,
+                ip_address TEXT,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+            )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_url_hash ON scans(url_hash)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_verdict ON scans(verdict)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_created ON scans(created_at)")
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS stats (
+                key TEXT PRIMARY KEY,
+                value BIGINT DEFAULT 0
+            )
+            """)
+            for k in ('total_scans','phishing_found','safe_found','suspicious_found'):
+                cur.execute("INSERT INTO stats (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (k, 0))
+            raw.commit()
+            cur.close()
+            raw.close()
+            print(f"[DB] ✓ Postgres initialized (DATABASE_URL)")
+        else:
+            conn = _get_sqlite_conn()
+            c = conn.cursor()
+            c.executescript('''
+            CREATE TABLE IF NOT EXISTS scans (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                url         TEXT NOT NULL,
+                url_hash    TEXT NOT NULL,
+                verdict     TEXT NOT NULL,
+                risk_score  REAL NOT NULL,
+                ml_score    REAL,
+                lr_score    REAL,
+                features    TEXT,
+                ai_analysis TEXT,
+                ip_address  TEXT,
+                created_at  TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_url_hash ON scans(url_hash);
+            CREATE INDEX IF NOT EXISTS idx_verdict  ON scans(verdict);
+            CREATE INDEX IF NOT EXISTS idx_created  ON scans(created_at);
 
-        CREATE TABLE IF NOT EXISTS stats (
-            key   TEXT PRIMARY KEY,
-            value INTEGER DEFAULT 0
-        );
-        INSERT OR IGNORE INTO stats VALUES ('total_scans', 0);
-        INSERT OR IGNORE INTO stats VALUES ('phishing_found', 0);
-        INSERT OR IGNORE INTO stats VALUES ('safe_found', 0);
-        INSERT OR IGNORE INTO stats VALUES ('suspicious_found', 0);
-        """)
-        conn.commit()
-        conn.close()
-        print(f"[DB] ✓ Initialized at {DB_PATH}")
+            CREATE TABLE IF NOT EXISTS stats (
+                key   TEXT PRIMARY KEY,
+                value INTEGER DEFAULT 0
+            );
+            INSERT OR IGNORE INTO stats VALUES ('total_scans', 0);
+            INSERT OR IGNORE INTO stats VALUES ('phishing_found', 0);
+            INSERT OR IGNORE INTO stats VALUES ('safe_found', 0);
+            INSERT OR IGNORE INTO stats VALUES ('suspicious_found', 0);
+            ''')
+            conn.commit()
+            conn.close()
+            print(f"[DB] ✓ SQLite initialized at {DB_PATH}")
     except Exception as e:
         print(f"[DB] ✗ Init failed: {e} — app will continue with in-memory mode")
 
@@ -591,10 +670,8 @@ def api_predict():
     # Get AI analysis
     ai_text = get_free_ai_analysis(normalized, verdict, risk_score, extras)
 
-    # Store in DB
-    conn = get_db()
-    c    = conn.cursor()
-    c.execute("""
+    # Store in DB (works with SQLite or Postgres)
+    execute_sql("""
         INSERT INTO scans (url, url_hash, verdict, risk_score, ml_score, lr_score, features, ai_analysis, ip_address, created_at)
         VALUES (?,?,?,?,?,?,?,?,?,?)
     """, (
@@ -605,10 +682,8 @@ def api_predict():
         request.remote_addr,
         datetime.utcnow().isoformat()
     ))
-    c.execute("UPDATE stats SET value = value + 1 WHERE key = 'total_scans'")
-    c.execute(f"UPDATE stats SET value = value + 1 WHERE key = '{verdict}_found'")
-    conn.commit()
-    conn.close()
+    execute_sql("UPDATE stats SET value = value + 1 WHERE key = ?", ('total_scans',))
+    execute_sql("UPDATE stats SET value = value + 1 WHERE key = ?", (f"{verdict}_found",))
 
     return jsonify({
         'url':        normalized,
@@ -633,8 +708,7 @@ def api_bulk():
 
     results = []
     invalid = []
-    conn = get_db()
-    c = conn.cursor()
+    conn = None
     for url in urls:
         normalized, err = normalize_and_validate_url(url)
         if err:
@@ -644,18 +718,17 @@ def api_bulk():
         result = ensemble_predict(normalized)
         verdict    = result['verdict']
         risk_score = result['risk_score']
-        c.execute("""
+        execute_sql("""
             INSERT INTO scans (url, url_hash, verdict, risk_score, ml_score, lr_score, features, created_at)
             VALUES (?,?,?,?,?,?,?,?)
         """, (normalized, url_hash, verdict, risk_score,
               result.get('ml_score'), result.get('lr_score'),
               json.dumps(result['features']), datetime.utcnow().isoformat()))
-        c.execute("UPDATE stats SET value = value + 1 WHERE key = 'total_scans'")
-        c.execute(f"UPDATE stats SET value = value + 1 WHERE key = '{verdict}_found'")
+        execute_sql("UPDATE stats SET value = value + 1 WHERE key = ?", ('total_scans',))
+        execute_sql("UPDATE stats SET value = value + 1 WHERE key = ?", (f"{verdict}_found",))
         results.append({'url': normalized, 'verdict': verdict, 'risk_score': risk_score,
                         'ml_score': result.get('ml_score')})
-    conn.commit()
-    conn.close()
+    # commits are handled inside execute_sql
     return jsonify({'results': results, 'count': len(results), 'invalid': invalid})
 
 
@@ -663,33 +736,28 @@ def api_bulk():
 def api_history():
     limit  = min(int(request.args.get('limit', 50)), 200)
     offset = int(request.args.get('offset', 0))
-    conn = get_db()
-    rows = conn.execute("""
+    rows = execute_sql("""
         SELECT id, url, verdict, risk_score, ml_score, lr_score, ai_analysis, created_at
         FROM scans ORDER BY created_at DESC LIMIT ? OFFSET ?
-    """, (limit, offset)).fetchall()
-    conn.close()
-    return jsonify({'history': [dict(r) for r in rows], 'limit': limit, 'offset': offset})
+    """, (limit, offset)) or []
+    return jsonify({'history': rows, 'limit': limit, 'offset': offset})
 
 
 @app.route('/api/stats', methods=['GET'])
 def api_stats():
-    conn = get_db()
-    rows = conn.execute("SELECT key, value FROM stats").fetchall()
+    rows = execute_sql("SELECT key, value FROM stats") or []
     stats_dict = {r['key']: r['value'] for r in rows}
 
     # Distribution
-    dist = conn.execute("""
-        SELECT verdict, COUNT(*) as cnt FROM scans GROUP BY verdict
-    """).fetchall()
+    dist = execute_sql("SELECT verdict, COUNT(*) as cnt FROM scans GROUP BY verdict") or []
     stats_dict['distribution'] = {r['verdict']: r['cnt'] for r in dist}
 
     # Recent 24h
-    recent = conn.execute("""
-        SELECT COUNT(*) as cnt FROM scans
-        WHERE created_at > datetime('now', '-24 hours')
-    """).fetchone()
-    stats_dict['last_24h'] = recent['cnt'] if recent else 0
+    if USE_POSTGRES:
+        recent = execute_sql("SELECT COUNT(*) as cnt FROM scans WHERE created_at > NOW() - INTERVAL '24 hours'")
+    else:
+        recent = execute_sql("SELECT COUNT(*) as cnt FROM scans WHERE created_at > datetime('now', '-24 hours')")
+    stats_dict['last_24h'] = (recent[0]['cnt'] if recent else 0)
 
     # Model info
     if WEIGHTS_DATA:
@@ -699,7 +767,7 @@ def api_stats():
         stats_dict['rf_accuracy']  = RF_MODEL.get('accuracy')
         stats_dict['rf_f1']        = RF_MODEL.get('f1')
     stats_dict.update(get_rf_state())
-    conn.close()
+    # no explicit close needed
     return jsonify(stats_dict)
 
 
@@ -708,13 +776,11 @@ def api_search():
     q = request.args.get('q', '').strip()
     if not q:
         return jsonify({'results': []})
-    conn = get_db()
-    rows = conn.execute("""
+    rows = execute_sql("""
         SELECT id, url, verdict, risk_score, created_at FROM scans
         WHERE url LIKE ? ORDER BY created_at DESC LIMIT 20
-    """, (f'%{q}%',)).fetchall()
-    conn.close()
-    return jsonify({'results': [dict(r) for r in rows]})
+    """, (f'%{q}%',)) or []
+    return jsonify({'results': rows})
 
 
 @app.route('/api/model-info', methods=['GET'])
